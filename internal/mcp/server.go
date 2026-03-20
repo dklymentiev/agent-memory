@@ -15,13 +15,12 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/steamfoundry/agent-memory/internal/chunker"
+	"github.com/steamfoundry/agent-memory/internal/common"
 	"github.com/steamfoundry/agent-memory/internal/config"
 	"github.com/steamfoundry/agent-memory/internal/embed"
 	"github.com/steamfoundry/agent-memory/internal/store"
 	"github.com/steamfoundry/agent-memory/internal/tagger"
 )
-
-const maxContentSize = 1 << 20 // 1MB
 
 // Server is the MCP stdio server.
 type Server struct {
@@ -383,8 +382,8 @@ func (s *Server) toolAdd(args json.RawMessage) (any, error) {
 	if err := json.Unmarshal(args, &p); err != nil {
 		return nil, err
 	}
-	if len(p.Content) > maxContentSize {
-		return nil, fmt.Errorf("content too large (%d bytes, max %d)", len(p.Content), maxContentSize)
+	if len(p.Content) > common.MaxContentSize {
+		return nil, fmt.Errorf("content too large (%d bytes, max %d)", len(p.Content), common.MaxContentSize)
 	}
 	ws := p.Workspace
 	if ws == "" {
@@ -403,10 +402,12 @@ func (s *Server) toolAdd(args json.RawMessage) (any, error) {
 	// Auto-tag: infer tags from similar documents and merge with user tags
 	inferred := tagger.InferTags(s.store, p.Content, ws, 5)
 	if len(inferred) > 0 {
-		merged := mergeTags(doc.Tags, inferred)
+		merged := common.MergeTags(doc.Tags, inferred)
 		if len(merged) > len(doc.Tags) {
 			doc.Tags = merged
-			_ = s.store.Update(doc)
+			if err := s.store.Update(doc); err != nil {
+				fmt.Fprintf(os.Stderr, "agent-memory: auto-tag update: %v\n", err)
+			}
 		}
 	}
 
@@ -414,7 +415,9 @@ func (s *Server) toolAdd(args json.RawMessage) (any, error) {
 	if len(p.Content) > 800 {
 		chunks := chunker.Chunk(p.Content, chunker.DefaultTargetSize, chunker.DefaultOverlap, chunker.DefaultMinSize)
 		if len(chunks) > 1 {
-			_ = s.store.AddChunks(doc.ID, chunks)
+			if err := s.store.AddChunks(doc.ID, chunks); err != nil {
+				fmt.Fprintf(os.Stderr, "agent-memory: add chunks: %v\n", err)
+			}
 		}
 	}
 
@@ -456,24 +459,10 @@ func (s *Server) embedChunksForDoc(docID string) {
 	}
 
 	for i, emb := range embeddings {
-		_ = s.store.UpdateChunkEmbedding(docChunks[i].ID, emb)
-	}
-}
-
-// mergeTags merges user-provided and inferred tags, user tags take priority.
-func mergeTags(userTags, inferred []string) []string {
-	seen := make(map[string]bool, len(userTags))
-	for _, t := range userTags {
-		seen[t] = true
-	}
-	merged := append([]string{}, userTags...)
-	for _, t := range inferred {
-		if !seen[t] {
-			merged = append(merged, t)
-			seen[t] = true
+		if err := s.store.UpdateChunkEmbedding(docChunks[i].ID, emb); err != nil {
+			fmt.Fprintf(os.Stderr, "agent-memory: update chunk embedding: %v\n", err)
 		}
 	}
-	return merged
 }
 
 func (s *Server) toolSearch(args json.RawMessage) (any, error) {
@@ -698,8 +687,8 @@ func (s *Server) toolUpdate(args json.RawMessage) (any, error) {
 	}
 
 	if p.Content != "" {
-		if len(p.Content) > maxContentSize {
-			return nil, fmt.Errorf("content too large (%d bytes, max %d)", len(p.Content), maxContentSize)
+		if len(p.Content) > common.MaxContentSize {
+			return nil, fmt.Errorf("content too large (%d bytes, max %d)", len(p.Content), common.MaxContentSize)
 		}
 		doc.Content = p.Content
 	}
@@ -715,7 +704,9 @@ func (s *Server) toolUpdate(args json.RawMessage) (any, error) {
 	if p.Content != "" && len(p.Content) > 800 {
 		chunks := chunker.Chunk(p.Content, chunker.DefaultTargetSize, chunker.DefaultOverlap, chunker.DefaultMinSize)
 		if len(chunks) > 1 {
-			_ = s.store.AddChunks(doc.ID, chunks)
+			if err := s.store.AddChunks(doc.ID, chunks); err != nil {
+				fmt.Fprintf(os.Stderr, "agent-memory: add chunks: %v\n", err)
+			}
 			s.embedChunksForDoc(doc.ID)
 		}
 	}
@@ -766,8 +757,8 @@ func (s *Server) toolSavePrompt(args json.RawMessage) (any, error) {
 	if p.Content == "" {
 		return nil, fmt.Errorf("content is required")
 	}
-	if len(p.Content) > maxContentSize {
-		return nil, fmt.Errorf("content too large (%d bytes, max %d)", len(p.Content), maxContentSize)
+	if len(p.Content) > common.MaxContentSize {
+		return nil, fmt.Errorf("content too large (%d bytes, max %d)", len(p.Content), common.MaxContentSize)
 	}
 
 	tags := append([]string{"type:prompt", "prompt:" + p.Name}, p.Tags...)

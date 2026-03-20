@@ -18,10 +18,7 @@ var initCmd = &cobra.Command{
 	RunE:  runInit,
 }
 
-var setupHooks bool
-
 func init() {
-	initCmd.Flags().BoolVar(&setupHooks, "setup-hooks", false, "install Claude Code hooks")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -58,14 +55,5 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Initialized agent-memory in %s\n", dir)
 
-	if setupHooks {
-		return installHooks(cwd)
-	}
-
-	return nil
-}
-
-func installHooks(projectDir string) error {
-	fmt.Println("Hook installation will be available in a future version.")
 	return nil
 }

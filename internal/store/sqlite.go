@@ -280,6 +280,7 @@ func (s *SQLiteStore) Search(query string, workspace string, limit int) ([]Searc
 		}
 		r.Tags = tagsFromJSON(tagsJSON)
 		r.Pinned = pinnedInt != 0
+		// Errors intentionally ignored: see scanDocument for rationale.
 		r.CreatedAt, _ = time.Parse(time.RFC3339, createdStr)
 		r.UpdatedAt, _ = time.Parse(time.RFC3339, updatedStr)
 		results = append(results, r)
@@ -435,13 +436,6 @@ func (s *SQLiteStore) SessionEnd(id, summary string) error {
 		return fmt.Errorf("session not found: %s", id)
 	}
 	return nil
-}
-
-// DBPath returns the path of the underlying database (via PRAGMA).
-func (s *SQLiteStore) DBPath() string {
-	var path string
-	s.db.QueryRow("PRAGMA database_list").Scan(nil, nil, &path)
-	return path
 }
 
 // UpdateChunkEmbedding stores an embedding for a chunk as raw little-endian float32 bytes.
@@ -784,6 +778,9 @@ func scanDocument(row scannable) (*Document, error) {
 	}
 	doc.Tags = tagsFromJSON(tagsJSON)
 	doc.Pinned = pinnedInt != 0
+	// Errors from time.Parse are intentionally ignored: timestamps are always
+	// written by this package in RFC3339 format, so parse failures cannot occur
+	// in practice. A zero time.Time is an acceptable fallback if they did.
 	doc.CreatedAt, _ = time.Parse(time.RFC3339, createdStr)
 	doc.UpdatedAt, _ = time.Parse(time.RFC3339, updatedStr)
 	return &doc, nil

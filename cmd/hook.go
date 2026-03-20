@@ -133,7 +133,9 @@ func hookPostToolUse() error {
 		Workspace: workspace,
 		Source:    "hook",
 	}
-	s.Add(doc)
+	if err := s.Add(doc); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory: hook store add: %v\n", err)
+	}
 	return nil
 }
 
@@ -219,7 +221,9 @@ func hookUserPromptSubmit() error {
 		Workspace: workspace,
 		Source:    "hook",
 	}
-	s.Add(doc)
+	if err := s.Add(doc); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory: hook store add: %v\n", err)
+	}
 	return nil
 }
 
@@ -272,7 +276,9 @@ func hookSessionEnd() error {
 		Workspace: workspace,
 		Source:    "hook",
 	}
-	s.Add(doc)
+	if err := s.Add(doc); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory: hook store add: %v\n", err)
+	}
 
 	// Also close the session in the sessions table if session_id provided
 	if input.SessionID != "" {

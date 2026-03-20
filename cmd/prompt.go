@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/steamfoundry/agent-memory/internal/common"
 	"github.com/steamfoundry/agent-memory/internal/store"
 )
 
@@ -57,7 +58,7 @@ func runPromptSave(cmd *cobra.Command, args []string) error {
 		// Try stdin
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, maxContentSize+1))
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, common.MaxContentSize+1))
 			if err != nil {
 				return fmt.Errorf("read stdin: %w", err)
 			}

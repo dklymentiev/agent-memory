@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/steamfoundry/agent-memory/internal/chunker"
+	"github.com/steamfoundry/agent-memory/internal/common"
 )
 
 var updateCmd = &cobra.Command{
@@ -47,7 +48,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		// Try stdin if not a terminal
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, maxContentSize+1))
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, common.MaxContentSize+1))
 			if err != nil {
 				return fmt.Errorf("read stdin: %w", err)
 			}
@@ -56,8 +57,8 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	if newContent != "" {
-		if len(newContent) > maxContentSize {
-			return fmt.Errorf("content too large (%d bytes, max %d)", len(newContent), maxContentSize)
+		if len(newContent) > common.MaxContentSize {
+			return fmt.Errorf("content too large (%d bytes, max %d)", len(newContent), common.MaxContentSize)
 		}
 		doc.Content = newContent
 	}
@@ -74,7 +75,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if newContent != "" && len(newContent) > 800 {
 		chunks := chunker.Chunk(newContent, chunker.DefaultTargetSize, chunker.DefaultOverlap, chunker.DefaultMinSize)
 		if len(chunks) > 1 {
-			_ = s.AddChunks(doc.ID, chunks)
+			if err := s.AddChunks(doc.ID, chunks); err != nil {
+				fmt.Fprintf(os.Stderr, "agent-memory: add chunks: %v\n", err)
+			}
 		}
 	}
 

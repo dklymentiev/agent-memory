@@ -43,11 +43,6 @@ func NewOpenAIEmbedder(apiKey string, model string) (*OpenAIEmbedder, error) {
 	}, nil
 }
 
-// Model returns the model name.
-func (e *OpenAIEmbedder) Model() string {
-	return e.model
-}
-
 type openaiRequest struct {
 	Input []string `json:"input"`
 	Model string   `json:"model"`
@@ -128,7 +123,9 @@ func (e *OpenAIEmbedder) doRequest(texts []string) ([][]float32, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		var apiResp openaiResponse
-		json.Unmarshal(respBody, &apiResp)
+		if err := json.Unmarshal(respBody, &apiResp); err != nil {
+			return nil, fmt.Errorf("OpenAI API error: HTTP %d (could not parse error body: %w)", resp.StatusCode, err)
+		}
 		msg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		if apiResp.Error != nil {
 			msg = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, apiResp.Error.Message)

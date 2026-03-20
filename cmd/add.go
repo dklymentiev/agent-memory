@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/steamfoundry/agent-memory/internal/chunker"
+	"github.com/steamfoundry/agent-memory/internal/common"
 	"github.com/steamfoundry/agent-memory/internal/embed"
 	"github.com/steamfoundry/agent-memory/internal/store"
 	"github.com/steamfoundry/agent-memory/internal/tagger"
@@ -65,10 +66,12 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Auto-tag: infer tags from similar documents and merge with user tags
 	inferred := tagger.InferTags(s, content, workspace, 5)
 	if len(inferred) > 0 {
-		merged := mergeTags(doc.Tags, inferred)
+		merged := common.MergeTags(doc.Tags, inferred)
 		if len(merged) > len(doc.Tags) {
 			doc.Tags = merged
-			_ = s.Update(doc)
+			if err := s.Update(doc); err != nil {
+				fmt.Fprintf(os.Stderr, "agent-memory: auto-tag update: %v\n", err)
+			}
 		}
 	}
 
@@ -76,7 +79,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if len(content) > 800 {
 		chunks := chunker.Chunk(content, chunker.DefaultTargetSize, chunker.DefaultOverlap, chunker.DefaultMinSize)
 		if len(chunks) > 1 {
-			_ = s.AddChunks(doc.ID, chunks)
+			if err := s.AddChunks(doc.ID, chunks); err != nil {
+				fmt.Fprintf(os.Stderr, "agent-memory: add chunks: %v\n", err)
+			}
 		}
 	}
 
@@ -130,33 +135,17 @@ func embedChunksForDoc(s *store.SQLiteStore, docID string) {
 	}
 
 	for i, emb := range embeddings {
-		_ = s.UpdateChunkEmbedding(docChunks[i].ID, emb)
-	}
-}
-
-// mergeTags merges user-provided and inferred tags, user tags take priority.
-func mergeTags(userTags, inferred []string) []string {
-	seen := make(map[string]bool, len(userTags))
-	for _, t := range userTags {
-		seen[t] = true
-	}
-	merged := append([]string{}, userTags...)
-	for _, t := range inferred {
-		if !seen[t] {
-			merged = append(merged, t)
-			seen[t] = true
+		if err := s.UpdateChunkEmbedding(docChunks[i].ID, emb); err != nil {
+			fmt.Fprintf(os.Stderr, "agent-memory: update chunk embedding: %v\n", err)
 		}
 	}
-	return merged
 }
-
-const maxContentSize = 1 << 20 // 1MB
 
 func resolveContent(args []string) (string, error) {
 	var content string
 
 	if addFile == "-" {
-		data, err := io.ReadAll(io.LimitReader(os.Stdin, maxContentSize+1))
+		data, err := io.ReadAll(io.LimitReader(os.Stdin, common.MaxContentSize+1))
 		if err != nil {
 			return "", fmt.Errorf("read stdin: %w", err)
 		}
@@ -173,7 +162,7 @@ func resolveContent(args []string) (string, error) {
 		// Try stdin if not a terminal
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, maxContentSize+1))
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, common.MaxContentSize+1))
 			if err != nil {
 				return "", fmt.Errorf("read stdin: %w", err)
 			}
@@ -183,8 +172,8 @@ func resolveContent(args []string) (string, error) {
 		}
 	}
 
-	if len(content) > maxContentSize {
-		return "", fmt.Errorf("content too large (%d bytes, max %d)", len(content), maxContentSize)
+	if len(content) > common.MaxContentSize {
+		return "", fmt.Errorf("content too large (%d bytes, max %d)", len(content), common.MaxContentSize)
 	}
 	return content, nil
 }

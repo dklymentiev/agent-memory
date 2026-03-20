@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	embedpkg "github.com/steamfoundry/agent-memory/internal/embed"
+	embedpkg "github.com/dklymentiev/agent-memory/internal/embed"
 
 	"github.com/segmentio/ksuid"
 	_ "modernc.org/sqlite"

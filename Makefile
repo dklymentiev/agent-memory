@@ -1,6 +1,6 @@
 VERSION ?= 0.1.0
 BINARY = agent-memory
-LDFLAGS = -s -w -X github.com/steamfoundry/agent-memory/cmd.Version=$(VERSION)
+LDFLAGS = -s -w -X github.com/dklymentiev/agent-memory/cmd.Version=$(VERSION)
 
 .PHONY: build test clean install
 

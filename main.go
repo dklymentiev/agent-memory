@@ -1,6 +1,6 @@
 package main
 
-import "github.com/steamfoundry/agent-memory/cmd"
+import "github.com/dklymentiev/agent-memory/cmd"
 
 func main() {
 	cmd.Execute()

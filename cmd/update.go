@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steamfoundry/agent-memory/internal/chunker"
-	"github.com/steamfoundry/agent-memory/internal/common"
+	"github.com/dklymentiev/agent-memory/internal/chunker"
+	"github.com/dklymentiev/agent-memory/internal/common"
 )
 
 var updateCmd = &cobra.Command{

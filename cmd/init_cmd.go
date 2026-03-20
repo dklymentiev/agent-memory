@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steamfoundry/agent-memory/internal/config"
-	"github.com/steamfoundry/agent-memory/internal/store"
+	"github.com/dklymentiev/agent-memory/internal/config"
+	"github.com/dklymentiev/agent-memory/internal/store"
 )
 
 var initCmd = &cobra.Command{

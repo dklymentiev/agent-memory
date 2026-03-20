@@ -14,13 +14,13 @@ auto-capture hooks, and an MCP server, all in a single binary backed by one SQLi
 
 ```bash
 # Option A: Install with Go (requires Go 1.21+; auto-downloads Go 1.25 toolchain)
-go install github.com/steamfoundry/agent-memory@latest
+go install github.com/dklymentiev/agent-memory@latest
 
 # Option B: Download from GitHub Releases
-# https://github.com/steamfoundry/agent-memory/releases
+# https://github.com/dklymentiev/agent-memory/releases
 
 # Option C: Build from source
-git clone https://github.com/steamfoundry/agent-memory.git
+git clone https://github.com/dklymentiev/agent-memory.git
 cd agent-memory
 make build      # produces ./agent-memory binary
 make install    # copies to /usr/local/bin

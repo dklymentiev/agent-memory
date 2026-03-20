@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/steamfoundry/agent-memory/internal/store"
+	"github.com/dklymentiev/agent-memory/internal/store"
 )
 
 // InferTags suggests tags based on similar documents found via FTS5.

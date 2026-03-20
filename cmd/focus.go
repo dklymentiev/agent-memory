@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/steamfoundry/agent-memory/internal/config"
+	"github.com/dklymentiev/agent-memory/internal/config"
 )
 
 var focusCmd = &cobra.Command{

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steamfoundry/agent-memory/internal/store"
+	"github.com/dklymentiev/agent-memory/internal/store"
 )
 
 var hookCmd = &cobra.Command{

@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/steamfoundry/agent-memory/internal/mcp"
+	"github.com/dklymentiev/agent-memory/internal/mcp"
 )
 
 var mcpCmd = &cobra.Command{

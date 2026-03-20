@@ -4,10 +4,10 @@
 
 ```bash
 # Install with Go (requires Go 1.21+; automatically downloads Go 1.25 toolchain)
-go install github.com/steamfoundry/agent-memory@latest
+go install github.com/dklymentiev/agent-memory@latest
 
 # Or download from GitHub Releases
-# https://github.com/steamfoundry/agent-memory/releases
+# https://github.com/dklymentiev/agent-memory/releases
 ```
 
 ## Why agent-memory?
@@ -200,7 +200,7 @@ All data lives in a single SQLite file:
 Requires Go 1.21+ (automatically downloads Go 1.25 toolchain).
 
 ```bash
-git clone https://github.com/steamfoundry/agent-memory.git
+git clone https://github.com/dklymentiev/agent-memory.git
 cd agent-memory
 make build    # builds ./agent-memory binary
 make test     # runs unit tests

@@ -1022,7 +1022,7 @@ Location: `~/.agent-memory/config.json` (or `$XDG_CONFIG_HOME/agent-memory/confi
 
 ```makefile
 VERSION ?= 0.1.0
-LDFLAGS = -s -w -X github.com/steamfoundry/agent-memory/cmd.Version=$(VERSION)
+LDFLAGS = -s -w -X github.com/dklymentiev/agent-memory/cmd.Version=$(VERSION)
 
 build:    go build -ldflags "$(LDFLAGS)" -o agent-memory .
 test:     go test ./internal/... -count=1

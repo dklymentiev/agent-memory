@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/segmentio/ksuid"
-	"github.com/steamfoundry/agent-memory/internal/chunker"
-	"github.com/steamfoundry/agent-memory/internal/common"
-	"github.com/steamfoundry/agent-memory/internal/config"
-	"github.com/steamfoundry/agent-memory/internal/embed"
-	"github.com/steamfoundry/agent-memory/internal/store"
-	"github.com/steamfoundry/agent-memory/internal/tagger"
+	"github.com/dklymentiev/agent-memory/internal/chunker"
+	"github.com/dklymentiev/agent-memory/internal/common"
+	"github.com/dklymentiev/agent-memory/internal/config"
+	"github.com/dklymentiev/agent-memory/internal/embed"
+	"github.com/dklymentiev/agent-memory/internal/store"
+	"github.com/dklymentiev/agent-memory/internal/tagger"
 )
 
 // Server is the MCP stdio server.

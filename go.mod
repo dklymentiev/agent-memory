@@ -1,4 +1,4 @@
-module github.com/steamfoundry/agent-memory
+module github.com/dklymentiev/agent-memory
 
 go 1.25.0
 

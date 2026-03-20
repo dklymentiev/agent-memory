@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/steamfoundry/agent-memory/internal/embed"
+	"github.com/dklymentiev/agent-memory/internal/embed"
 )
 
 var embeddingsCmd = &cobra.Command{

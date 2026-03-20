@@ -3,7 +3,7 @@
 **Persistent memory for AI coding agents.** Single binary, instant full-text search, workspaces, MCP server.
 
 ```bash
-# Install with Go (requires Go 1.21+ for automatic toolchain management)
+# Install with Go (requires Go 1.21+; automatically downloads Go 1.25 toolchain)
 go install github.com/steamfoundry/agent-memory@latest
 
 # Or download from GitHub Releases
@@ -85,10 +85,19 @@ Or add to `.mcp.json`:
 | Tool | Description |
 |------|------------|
 | `memory_add` | Add a new memory document (max 1MB) |
-| `memory_search` | Full-text search with BM25 ranking |
-| `memory_context` | Smart context: pinned + recent + relevant |
-| `memory_list` | List documents with filters |
-| `memory_focus` | Switch workspace |
+| `memory_search` | Full-text search with BM25 ranking (auto-upgrades to hybrid when embeddings enabled) |
+| `memory_context` | Smart context: pinned + recent + relevant, with character budget |
+| `memory_list` | List documents with filters (workspace, tag, limit) |
+| `memory_focus` | Switch active workspace |
+| `memory_delete` | Delete a memory document by ID |
+| `memory_update` | Update a document's content and/or tags |
+| `memory_stats` | Get memory statistics: document count, workspaces, DB size |
+| `memory_timeline` | Get documents in chronological order for a date range |
+| `memory_save_prompt` | Save a reusable prompt template by name |
+| `memory_get_prompt` | Retrieve a saved prompt template by name |
+| `memory_suggest_tags` | Suggest relevant tags for given content based on similar documents |
+| `memory_session_start` | Start a new session for tracking agent work |
+| `memory_session_end` | End a session and record summary |
 
 ## Claude Code Hooks
 
@@ -99,7 +108,9 @@ Auto-capture context from your coding sessions. Add to your hooks config:
   "hooks": [
     {"event": "PostToolUse", "command": "agent-memory hook post-tool-use", "timeout": 5000},
     {"event": "SessionStart", "command": "agent-memory hook session-start", "timeout": 5000},
-    {"event": "Stop", "command": "agent-memory hook stop", "timeout": 5000}
+    {"event": "Stop", "command": "agent-memory hook stop", "timeout": 5000},
+    {"event": "UserPromptSubmit", "command": "agent-memory hook user-prompt-submit", "timeout": 5000},
+    {"event": "SessionEnd", "command": "agent-memory hook session-end", "timeout": 5000}
   ]
 }
 ```
@@ -109,8 +120,10 @@ Auto-capture context from your coding sessions. Add to your hooks config:
 | Event | What it does |
 |-------|-------------|
 | `post-tool-use` | Captures tool outputs (with sensitive data scrubbing) |
-| `session-start` | Injects relevant context into new sessions |
-| `stop` | Session end handler |
+| `session-start` | Injects relevant context (pinned + recent) into new sessions |
+| `stop` | Session end handler (no-op placeholder) |
+| `user-prompt-submit` | Captures user prompts (with sensitive data scrubbing) |
+| `session-end` | Writes session summary and closes session record |
 
 ## Workspaces
 
@@ -158,13 +171,7 @@ agent-memory list -t type:decision
 ## Planned
 
 - [ ] Semantic search via local ONNX embeddings (e5-small, opt-in download)
-- [ ] OpenAI/Anthropic embeddings API fallback
-- [ ] Hybrid search (FTS5 + vector similarity with configurable weights)
-- [ ] Auto-tag inference from similar documents
-- [ ] Markdown-aware document chunking for better embedding quality
-- [ ] Session summaries on stop
 - [ ] Data retention TTL with automatic cleanup
-- [ ] `memory delete` CLI command and MCP tool
 - [ ] Web UI
 
 ## Storage
@@ -190,7 +197,7 @@ All data lives in a single SQLite file:
 
 ## Building from Source
 
-Requires Go 1.21+ (automatically downloads Go toolchain if needed).
+Requires Go 1.21+ (automatically downloads Go 1.25 toolchain).
 
 ```bash
 git clone https://github.com/steamfoundry/agent-memory.git

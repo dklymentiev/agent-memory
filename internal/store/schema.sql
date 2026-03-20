@@ -1,5 +1,12 @@
 -- agent-memory schema v1
 
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER NOT NULL,
+    applied_at TEXT DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO schema_version (rowid, version) VALUES (1, 1);
+
 CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
     content TEXT NOT NULL,

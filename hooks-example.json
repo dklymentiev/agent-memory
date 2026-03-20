@@ -1,0 +1,9 @@
+{
+  "hooks": [
+    {"event": "PostToolUse", "command": "agent-memory hook post-tool-use", "timeout": 5000},
+    {"event": "SessionStart", "command": "agent-memory hook session-start", "timeout": 5000},
+    {"event": "Stop", "command": "agent-memory hook stop", "timeout": 5000},
+    {"event": "UserPromptSubmit", "command": "agent-memory hook user-prompt-submit", "timeout": 5000},
+    {"event": "SessionEnd", "command": "agent-memory hook session-end", "timeout": 5000}
+  ]
+}

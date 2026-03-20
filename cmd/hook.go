@@ -85,13 +85,17 @@ func runHook(cmd *cobra.Command, args []string) error {
 		return hookSessionStart()
 	case "stop":
 		return hookStop()
+	case "user-prompt-submit":
+		return hookUserPromptSubmit()
+	case "session-end":
+		return hookSessionEnd()
 	default:
 		return fmt.Errorf("unknown hook event: %s", event)
 	}
 }
 
 func hookPostToolUse() error {
-	data, err := io.ReadAll(os.Stdin)
+	data, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agent-memory hook: read stdin: %v\n", err)
 		os.Exit(1)
@@ -176,6 +180,105 @@ func hookSessionStart() error {
 }
 
 func hookStop() error {
+	return nil
+}
+
+func hookUserPromptSubmit() error {
+	data, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory hook: read stdin: %v\n", err)
+		os.Exit(1)
+	}
+
+	var input struct {
+		SessionID string `json:"session_id"`
+		Prompt    string `json:"prompt"`
+	}
+	if err := json.Unmarshal(data, &input); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory hook: invalid JSON input: %v\n", err)
+		os.Exit(1)
+	}
+
+	if strings.TrimSpace(input.Prompt) == "" {
+		return nil
+	}
+
+	content := scrubSensitive(input.Prompt)
+	content = truncate(content, 1000)
+
+	s, err := openStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory hook: open store: %v\n", err)
+		return nil
+	}
+	defer s.Close()
+
+	doc := &store.Document{
+		Content:   content,
+		Tags:      []string{"source:hook", "type:user-prompt"},
+		Workspace: workspace,
+		Source:    "hook",
+	}
+	s.Add(doc)
+	return nil
+}
+
+func hookSessionEnd() error {
+	data, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory hook: read stdin: %v\n", err)
+		os.Exit(1)
+	}
+
+	var input struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := json.Unmarshal(data, &input); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory hook: invalid JSON input: %v\n", err)
+		os.Exit(1)
+	}
+
+	s, err := openStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory hook: open store: %v\n", err)
+		return nil
+	}
+	defer s.Close()
+
+	// Get the last 5 recent documents to build a summary
+	recentDocs, err := s.List(store.ListOptions{
+		Workspace: workspace,
+		Limit:     5,
+	})
+	if err != nil || len(recentDocs) == 0 {
+		return nil
+	}
+
+	var summaryLines []string
+	for _, d := range recentDocs {
+		line := d.Content
+		// Take first line or truncate
+		if idx := strings.Index(line, "\n"); idx > 0 {
+			line = line[:idx]
+		}
+		line = truncate(line, 100)
+		summaryLines = append(summaryLines, "- "+line)
+	}
+	summary := "Session summary:\n" + strings.Join(summaryLines, "\n")
+
+	doc := &store.Document{
+		Content:   summary,
+		Tags:      []string{"type:session-summary", "source:hook"},
+		Workspace: workspace,
+		Source:    "hook",
+	}
+	s.Add(doc)
+
+	// Also close the session in the sessions table if session_id provided
+	if input.SessionID != "" {
+		_ = s.SessionEnd(input.SessionID, summary)
+	}
+
 	return nil
 }
 

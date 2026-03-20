@@ -32,6 +32,21 @@ type ListOptions struct {
 	Offset    int
 }
 
+// Stats holds aggregate statistics about the store.
+type Stats struct {
+	DocCount        int            `json:"doc_count"`
+	WorkspaceCounts map[string]int `json:"workspace_counts"`
+	DBSize          int64          `json:"db_size_bytes"`
+}
+
+// ChunkRecord represents a chunk row for embedding operations.
+type ChunkRecord struct {
+	ID        int64
+	DocID     string
+	ChunkIdx  int
+	ChunkText string
+}
+
 // Store is the interface for document persistence.
 type Store interface {
 	Add(doc *Document) error
@@ -40,5 +55,14 @@ type Store interface {
 	Delete(id string) error
 	List(opts ListOptions) ([]Document, error)
 	Search(query string, workspace string, limit int) ([]SearchResult, error)
+	SearchSemantic(queryEmbedding []float32, workspace string, limit int) ([]SearchResult, error)
+	HybridSearch(query string, queryEmbedding []float32, workspace string, limit int) ([]SearchResult, error)
+	UpdateChunkEmbedding(chunkID int64, embedding []float32) error
+	GetUnembeddedChunks(limit int) ([]ChunkRecord, error)
+	Stats() (*Stats, error)
+	AddChunks(docID string, chunks []string) error
+	Timeline(startDate, endDate, workspace string, limit int) ([]Document, error)
+	SessionStart(id, project, workspace string) error
+	SessionEnd(id, summary string) error
 	Close() error
 }

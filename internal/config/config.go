@@ -10,6 +10,7 @@ import (
 type Config struct {
 	ActiveWorkspace   string `json:"active_workspace"`
 	EmbeddingProvider string `json:"embedding_provider,omitempty"` // "", "onnx", "openai"
+	EmbeddingModel    string `json:"embedding_model,omitempty"`    // "text-embedding-3-small"
 	DBPath            string `json:"db_path,omitempty"`
 }
 

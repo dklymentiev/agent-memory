@@ -17,14 +17,30 @@ var contextCmd = &cobra.Command{
 }
 
 var (
-	contextLimit int
-	contextQuery string
+	contextLimit  int
+	contextQuery  string
+	contextBudget int
 )
 
 func init() {
 	contextCmd.Flags().IntVarP(&contextLimit, "limit", "n", 5, "max documents per section")
 	contextCmd.Flags().StringVarP(&contextQuery, "query", "q", "", "additional search query")
+	contextCmd.Flags().IntVar(&contextBudget, "budget", 1000, "character budget for context output")
 	rootCmd.AddCommand(contextCmd)
+}
+
+// firstLineOf returns the first non-empty line of s.
+func firstLineOf(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	if len(s) > 100 {
+		return s[:100] + "..."
+	}
+	return s
 }
 
 func runContext(cmd *cobra.Command, args []string) error {
@@ -34,9 +50,15 @@ func runContext(cmd *cobra.Command, args []string) error {
 	}
 	defer s.Close()
 
+	budget := contextBudget
+	if budget <= 0 {
+		budget = 1000
+	}
+	used := 0
+
 	var sections []string
 
-	// 1. Pinned documents
+	// Layer 1: Pinned documents (titles/first line only)
 	pinned := true
 	pinnedDocs, err := s.List(store.ListOptions{
 		Workspace: workspace,
@@ -44,34 +66,47 @@ func runContext(cmd *cobra.Command, args []string) error {
 		Limit:     contextLimit,
 	})
 	if err == nil && len(pinnedDocs) > 0 {
-		var b strings.Builder
-		b.WriteString("## Pinned\n\n")
+		var lines []string
 		for _, d := range pinnedDocs {
-			b.WriteString(d.Content)
-			b.WriteString("\n\n")
+			line := firstLineOf(d.Content)
+			entry := fmt.Sprintf("- [short] %s", line)
+			if used+len(entry) > budget {
+				break
+			}
+			lines = append(lines, entry)
+			used += len(entry) + 1
 		}
-		sections = append(sections, b.String())
+		if len(lines) > 0 {
+			sections = append(sections, "## Pinned\n"+strings.Join(lines, "\n"))
+		}
 	}
 
-	// 2. Recent documents
+	// Layer 2: Recent document summaries (first 100 chars each)
 	recentDocs, err := s.List(store.ListOptions{
 		Workspace: workspace,
 		Limit:     contextLimit,
 	})
-	if err == nil && len(recentDocs) > 0 {
-		var b strings.Builder
-		b.WriteString("## Recent\n\n")
+	if err == nil && len(recentDocs) > 0 && used < budget {
+		var lines []string
 		for _, d := range recentDocs {
 			content := d.Content
-			if len(content) > 300 {
-				content = content[:300] + "..."
+			if len(content) > 100 {
+				content = content[:100] + "..."
 			}
-			b.WriteString(fmt.Sprintf("- [%s] %s\n", d.ID, strings.ReplaceAll(content, "\n", " ")))
+			content = strings.ReplaceAll(content, "\n", " ")
+			entry := fmt.Sprintf("- [%s] %s", d.CreatedAt.Format("2006-01-02"), content)
+			if used+len(entry) > budget {
+				break
+			}
+			lines = append(lines, entry)
+			used += len(entry) + 1
 		}
-		sections = append(sections, b.String())
+		if len(lines) > 0 {
+			sections = append(sections, "## Recent (last 24h)\n"+strings.Join(lines, "\n"))
+		}
 	}
 
-	// 3. Project-relevant (search by CWD basename)
+	// Layer 3: Relevant documents (full content if budget allows)
 	if contextQuery == "" {
 		cwd, _ := os.Getwd()
 		if cwd != "" {
@@ -81,19 +116,31 @@ func runContext(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	if contextQuery != "" {
+	if contextQuery != "" && used < budget {
 		results, err := s.Search(contextQuery, workspace, contextLimit)
 		if err == nil && len(results) > 0 {
-			var b strings.Builder
-			b.WriteString("## Relevant\n\n")
+			var lines []string
 			for _, r := range results {
 				content := r.Content
-				if len(content) > 300 {
-					content = content[:300] + "..."
+				maxLen := 200
+				remaining := budget - used
+				if remaining < maxLen {
+					maxLen = remaining
 				}
-				b.WriteString(fmt.Sprintf("- [%s] %s\n", r.ID, strings.ReplaceAll(content, "\n", " ")))
+				if maxLen <= 0 {
+					break
+				}
+				if len(content) > maxLen {
+					content = content[:maxLen] + "..."
+				}
+				content = strings.ReplaceAll(content, "\n", " ")
+				entry := fmt.Sprintf("- [%s] %s", r.ID, content)
+				lines = append(lines, entry)
+				used += len(entry) + 1
 			}
-			sections = append(sections, b.String())
+			if len(lines) > 0 {
+				sections = append(sections, "## Relevant to: "+contextQuery+"\n"+strings.Join(lines, "\n"))
+			}
 		}
 	}
 
@@ -102,6 +149,6 @@ func runContext(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Print(strings.Join(sections, "\n"))
+	fmt.Print(strings.Join(sections, "\n\n"))
 	return nil
 }

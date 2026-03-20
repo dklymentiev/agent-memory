@@ -23,6 +23,6 @@ func runMCP(cmd *cobra.Command, args []string) error {
 	}
 	defer s.Close()
 
-	server := mcp.NewServer(s, workspace)
+	server := mcp.NewServer(s, workspace, Version)
 	return server.Run()
 }

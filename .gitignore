@@ -1,0 +1,14 @@
+agent-memory
+*.db
+*.mem
+*.test
+coverage.out
+dist/
+.agent-memory/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+.env
+.env.local

@@ -1,0 +1,47 @@
+package config
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+)
+
+// Config holds the application configuration.
+type Config struct {
+	ActiveWorkspace   string `json:"active_workspace"`
+	EmbeddingProvider string `json:"embedding_provider,omitempty"` // "", "onnx", "openai"
+	DBPath            string `json:"db_path,omitempty"`
+}
+
+const configFileName = "config.json"
+
+// Load reads config from disk or returns defaults.
+func Load() *Config {
+	cfg := &Config{
+		ActiveWorkspace: "default",
+	}
+
+	data, err := os.ReadFile(configFilePath())
+	if err != nil {
+		return cfg
+	}
+	json.Unmarshal(data, cfg)
+	return cfg
+}
+
+// Save writes config to disk.
+func (c *Config) Save() error {
+	path := configFilePath()
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
+func configFilePath() string {
+	return filepath.Join(ConfigDir(), configFileName)
+}

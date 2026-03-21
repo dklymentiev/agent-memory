@@ -60,7 +60,6 @@ var instructionDenyList = []string{
 	"new instructions:",
 	"system prompt:",
 	"you are now",
-	"act as",
 	"pretend to be",
 	"override your",
 	"ignore your rules",
@@ -69,7 +68,6 @@ var instructionDenyList = []string{
 	"your new role is",
 	"you must now",
 	"do not follow your",
-	"stop being",
 	"instead of following",
 	"<system>",
 	"</system>",
@@ -97,14 +95,12 @@ func runHook(cmd *cobra.Command, args []string) error {
 func hookPostToolUse() error {
 	data, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "agent-memory hook: read stdin: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("read stdin: %w", err)
 	}
 
 	var input HookInput
 	if err := json.Unmarshal(data, &input); err != nil {
-		fmt.Fprintf(os.Stderr, "agent-memory hook: invalid JSON input: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("invalid JSON input: %w", err)
 	}
 
 	// Skip noisy tools
@@ -188,8 +184,7 @@ func hookStop() error {
 func hookUserPromptSubmit() error {
 	data, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "agent-memory hook: read stdin: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("read stdin: %w", err)
 	}
 
 	var input struct {
@@ -197,8 +192,7 @@ func hookUserPromptSubmit() error {
 		Prompt    string `json:"prompt"`
 	}
 	if err := json.Unmarshal(data, &input); err != nil {
-		fmt.Fprintf(os.Stderr, "agent-memory hook: invalid JSON input: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("invalid JSON input: %w", err)
 	}
 
 	if strings.TrimSpace(input.Prompt) == "" {
@@ -230,16 +224,14 @@ func hookUserPromptSubmit() error {
 func hookSessionEnd() error {
 	data, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "agent-memory hook: read stdin: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("read stdin: %w", err)
 	}
 
 	var input struct {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.Unmarshal(data, &input); err != nil {
-		fmt.Fprintf(os.Stderr, "agent-memory hook: invalid JSON input: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("invalid JSON input: %w", err)
 	}
 
 	s, err := openStore()
@@ -289,10 +281,11 @@ func hookSessionEnd() error {
 }
 
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	runes := []rune(s)
+	if len(runes) <= max {
 		return s
 	}
-	return s[:max] + "..."
+	return string(runes[:max]) + "..."
 }
 
 // scrubSensitive removes sensitive patterns from content before storage.

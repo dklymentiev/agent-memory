@@ -1,73 +1,83 @@
 # agent-memory
 
-**Persistent memory for AI coding agents.** Single binary, instant full-text search, workspaces, MCP server.
+[![CI](https://github.com/dklymentiev/agent-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/dklymentiev/agent-memory/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dklymentiev/agent-memory)](https://goreportcard.com/report/github.com/dklymentiev/agent-memory)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**Persistent memory for AI coding agents.** Single binary. Zero setup. Instant search.
+
+AI agents forget everything between sessions. You repeat context, re-explain decisions, re-describe architecture. **agent-memory** fixes this -- it gives your agent a persistent, searchable memory backed by a single SQLite file.
 
 ```bash
-# Install with Go (requires Go 1.21+; automatically downloads Go 1.25 toolchain)
 go install github.com/dklymentiev/agent-memory@latest
-
-# Or download from GitHub Releases
-# https://github.com/dklymentiev/agent-memory/releases
 ```
 
-## Why agent-memory?
+## The Problem
 
-AI coding agents (Claude Code, Cursor, Aider) lose context between sessions. You repeat yourself. The agent forgets decisions, patterns, and project knowledge.
+Every time you start a new Claude Code session, your agent starts from scratch:
 
-**agent-memory** fixes this:
+- "We decided to use PostgreSQL for this" -- you've said it 5 times
+- "Don't deploy on Fridays" -- the agent doesn't know
+- "The auth flow uses JWT refresh tokens" -- explained it last week, gone today
 
-- **Instant FTS5 search** -- full-text search with BM25 ranking, zero setup
-- **Workspaces** -- separate memories per project, team, or role
-- **Auto-capture hooks** -- capture important context from tool usage with sensitive data scrubbing
-- **MCP server** -- native integration with any MCP-compatible agent
-- **Single file storage** -- one SQLite `.db` file, no external databases
-- **Content dedup** -- SHA-256 hash prevents duplicate storage
+## The Solution
 
-### Dependencies
+```bash
+# Save a decision once
+agent-memory add "Auth uses JWT refresh tokens, 15min access / 7d refresh" \
+  -t type:decision -t topic:auth
 
-agent-memory compiles to a single static binary. Build dependencies (resolved automatically by Go):
+# Agent finds it when relevant
+agent-memory search "authentication tokens"
 
-| Dependency | Purpose |
-|-----------|---------|
-| `modernc.org/sqlite` | Pure-Go SQLite with FTS5 (no CGO) |
-| `github.com/spf13/cobra` | CLI framework |
-| `github.com/segmentio/ksuid` | Sortable unique IDs |
+# Or get smart context automatically at session start
+agent-memory context
+```
 
-No runtime dependencies. No external database. No Docker.
+One binary. One SQLite file. No Docker. No external database. No configuration required.
+
+## Key Features
+
+**Search that works** -- FTS5 full-text search with BM25 ranking. Optional hybrid search with OpenAI embeddings (30% keyword + 70% semantic). Finds what you need even with different wording.
+
+**Workspaces** -- isolate memories per project. `agent-memory focus backend-api` and everything stays separate.
+
+**MCP server** -- 14 tools for Claude Code, Cursor, or any MCP-compatible agent. One command to set up: `claude mcp add agent-memory -- agent-memory mcp`
+
+**Auto-capture hooks** -- automatically saves tool outputs and user prompts from Claude Code sessions. Sensitive data (passwords, API keys, tokens, JWTs) is scrubbed before storage.
+
+**Smart context** -- progressive disclosure system assembles the right context for each session: pinned memories first, then recent, then search results -- all within a token budget.
+
+Also: auto-tagging, markdown-aware chunking, content dedup (SHA-256), prompt templates, timeline view, JSON/Markdown export, prompt injection protection.
 
 ## Quick Start
 
 ```bash
-# Add a memory
-agent-memory add "Always use snake_case for Python functions in this project" \
+# Add memories
+agent-memory add "Use snake_case for Python, camelCase for TypeScript" \
   -t type:decision -t topic:style
 
-# Search memories
+# Search
 agent-memory search "naming conventions"
 
 # Switch workspace
 agent-memory focus my-project
 
-# Get context for current session (pinned + recent + relevant)
+# Get session context (pinned + recent + relevant)
 agent-memory context
 
-# Pipe content from files
+# Pipe files into memory
 cat ARCHITECTURE.md | agent-memory add -f - -t type:artifact --pin
-
-# Export all memories
-agent-memory export --format json
 ```
 
-## MCP Server
-
-Use agent-memory as an MCP server for Claude Code or any MCP-compatible client:
+## MCP Server (Claude Code Integration)
 
 ```bash
-# Add to Claude Code
+# One-liner setup
 claude mcp add agent-memory -- agent-memory mcp
 ```
 
-Or add to `.mcp.json`:
+Or add to `.mcp.json` in your project:
 
 ```json
 {
@@ -80,132 +90,86 @@ Or add to `.mcp.json`:
 }
 ```
 
-**Available MCP tools:**
+14 MCP tools available: `memory_add`, `memory_search`, `memory_context`, `memory_list`, `memory_focus`, `memory_delete`, `memory_update`, `memory_stats`, `memory_timeline`, `memory_save_prompt`, `memory_get_prompt`, `memory_suggest_tags`, `memory_session_start`, `memory_session_end`.
 
-| Tool | Description |
-|------|------------|
-| `memory_add` | Add a new memory document (max 1MB) |
-| `memory_search` | Full-text search with BM25 ranking (auto-upgrades to hybrid when embeddings enabled) |
-| `memory_context` | Smart context: pinned + recent + relevant, with character budget |
-| `memory_list` | List documents with filters (workspace, tag, limit) |
-| `memory_focus` | Switch active workspace |
-| `memory_delete` | Delete a memory document by ID |
-| `memory_update` | Update a document's content and/or tags |
-| `memory_stats` | Get memory statistics: document count, workspaces, DB size |
-| `memory_timeline` | Get documents in chronological order for a date range |
-| `memory_save_prompt` | Save a reusable prompt template by name |
-| `memory_get_prompt` | Retrieve a saved prompt template by name |
-| `memory_suggest_tags` | Suggest relevant tags for given content based on similar documents |
-| `memory_session_start` | Start a new session for tracking agent work |
-| `memory_session_end` | End a session and record summary |
+See [docs/guide.md](docs/guide.md) for details on each tool.
 
 ## Claude Code Hooks
 
-Auto-capture context from your coding sessions. Add to your hooks config:
+Auto-capture context from coding sessions:
 
 ```json
 {
   "hooks": [
     {"event": "PostToolUse", "command": "agent-memory hook post-tool-use", "timeout": 5000},
     {"event": "SessionStart", "command": "agent-memory hook session-start", "timeout": 5000},
-    {"event": "Stop", "command": "agent-memory hook stop", "timeout": 5000},
     {"event": "UserPromptSubmit", "command": "agent-memory hook user-prompt-submit", "timeout": 5000},
     {"event": "SessionEnd", "command": "agent-memory hook session-end", "timeout": 5000}
   ]
 }
 ```
 
-**Hook events:**
+Hooks scrub sensitive data (passwords, API keys, tokens, JWTs, private keys) and protect against prompt injection.
 
-| Event | What it does |
-|-------|-------------|
-| `post-tool-use` | Captures tool outputs (with sensitive data scrubbing) |
-| `session-start` | Injects relevant context (pinned + recent) into new sessions |
-| `stop` | Session end handler (no-op placeholder) |
-| `user-prompt-submit` | Captures user prompts (with sensitive data scrubbing) |
-| `session-end` | Writes session summary and closes session record |
+## How It Compares
 
-## Workspaces
+| | agent-memory | mem0 | Zep | ChromaDB |
+|---|---|---|---|---|
+| Setup | `go install`, done | Python + API key | Docker + Postgres | Python + server |
+| Dependencies | None (single binary) | Python, OpenAI | Docker, Postgres, Redis | Python, multiple |
+| Storage | Single SQLite file | Cloud or self-hosted | Postgres | Persistent dir |
+| MCP support | Built-in (14 tools) | No | No | No |
+| Search | FTS5 + optional embeddings | Embeddings only | Embeddings + graph | Embeddings only |
+| Works offline | Yes (FTS5 mode) | No | Yes | Yes |
+| Binary size | ~11MB | N/A | N/A | N/A |
 
-Organize memories by project, team, or role:
-
-```bash
-agent-memory focus backend-api        # switch workspace
-agent-memory add "..." -w backend-api # add to specific workspace
-agent-memory search "Redis" -w ""     # search all workspaces
-agent-memory list                     # list in current workspace
-```
-
-## Tags
-
-```bash
-agent-memory add "Use PostgreSQL" -t type:decision -t topic:database
-agent-memory list -t type:decision
-
-# Common prefixes: type: topic: project: source:
-```
+agent-memory is designed for **personal/small-team use** with AI coding agents. If you need a production vector database for millions of documents, use ChromaDB or Pinecone. If you want something that works in 10 seconds with zero infrastructure, this is it.
 
 ## Security
 
-- Database and config files use restricted permissions (0600/0700)
-- PostToolUse hook scrubs sensitive patterns (passwords, API keys, tokens, JWTs, private keys, URL credentials)
-- Session context output is sanitized against prompt injection (XML boundary markers, instruction pattern deny-list)
-- FTS5 search queries are sanitized to prevent query injection
-- LIKE wildcards are escaped in tag filters
-- Content size capped at 1MB per document
-- Workspace names are validated (alphanumeric, hyphens, underscores, max 64 chars)
+- Database and config files: restricted permissions (0600/0700)
+- Hook data: sensitive patterns scrubbed before storage (12 regex rules)
+- Session context: prompt injection protection (XML boundaries + 17-pattern deny-list)
+- Search queries: FTS5 and LIKE injection sanitized
+- Content: 1MB limit, SHA-256 dedup, workspace name validation
 
-## Comparison
-
-| Feature | agent-memory | claude-mem | beads | engram |
-|---------|:----------:|:--------:|:----:|:-----:|
-| Single binary | yes | -- | yes | yes |
-| Full-text search | FTS5+BM25 | yes | -- | -- |
-| Auto-capture hooks | 3 hooks | 6 hooks | 2 hooks | -- |
-| MCP server | built-in | -- | Python | -- |
-| Workspaces | yes | -- | -- | -- |
-| Pinned documents | yes | -- | -- | -- |
-| Content dedup | SHA-256 | -- | hash | -- |
-| Single-file storage | .db | -- | -- | yes |
-
-## Planned
-
-- [ ] Semantic search via local ONNX embeddings (e5-small, opt-in download)
-- [ ] Data retention TTL with automatic cleanup
-- [ ] Web UI
+See [SECURITY.md](SECURITY.md) for full details.
 
 ## Storage
 
-All data lives in a single SQLite file:
+All data in one file:
 
-```bash
-# Default: ~/.agent-memory/memory.db
-# Per-project: .agent-memory/memory.db (via `agent-memory init`)
-# Custom: agent-memory --db /path/to/custom.db add "content"
+```
+~/.agent-memory/memory.db          # default (global)
+.agent-memory/memory.db            # per-project (via agent-memory init)
+agent-memory --db /path/to/my.db   # custom path
 ```
 
-## Configuration
+## Documentation
 
-`~/.agent-memory/config.json`:
+- [User Guide](docs/guide.md) -- installation, all features, configuration
+- [Technical Reference](docs/reference.md) -- all types, functions, schemas, CLI flags
+- [Architecture](ARCHITECTURE.md) -- internal design, data flow, package structure
+- [Contributing](CONTRIBUTING.md) -- development setup, code style, PR guidelines
+- [Security](SECURITY.md) -- threat model, protections, vulnerability reporting
 
-```json
-{
-  "active_workspace": "default",
-  "db_path": ""
-}
-```
+## Planned
+
+- [ ] Local embeddings via ONNX (e5-small) -- no OpenAI dependency
+- [ ] Data retention TTL with automatic cleanup
+- [ ] Web UI for browsing and searching memories
 
 ## Building from Source
-
-Requires Go 1.21+ (automatically downloads Go 1.25 toolchain).
 
 ```bash
 git clone https://github.com/dklymentiev/agent-memory.git
 cd agent-memory
-make build    # builds ./agent-memory binary
-make test     # runs unit tests
-make install  # copies to /usr/local/bin
+make build      # builds ./agent-memory
+make test       # runs tests
+make install    # copies to /usr/local/bin
 ```
+
+Requires Go 1.21+ (automatically downloads Go 1.25 toolchain).
 
 ## License
 

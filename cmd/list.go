@@ -68,8 +68,8 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	for _, d := range docs {
 		content := d.Content
-		if len(content) > 80 {
-			content = content[:80] + "..."
+		if r := []rune(content); len(r) > 80 {
+			content = string(r[:80]) + "..."
 		}
 		content = strings.ReplaceAll(content, "\n", " ")
 		tags := ""

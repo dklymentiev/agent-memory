@@ -53,7 +53,9 @@ func Open(path string) (*SQLiteStore, error) {
 	}
 
 	// Restrict DB file permissions
-	os.Chmod(path, 0600)
+	if err := os.Chmod(path, 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory: chmod db file: %v\n", err)
+	}
 
 	return &SQLiteStore{db: db}, nil
 }

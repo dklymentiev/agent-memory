@@ -1,13 +1,72 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
 jobs:
   test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build
+        run: go build -ldflags "-s -w" ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./internal/... -count=1 -race -timeout 120s
+
+  coverage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test ./internal/... -count=1
+
+      - name: Test with coverage
+        run: go test ./internal/... -count=1 -coverprofile=coverage.out -covermode=atomic
+
+      - name: Print coverage summary
+        run: go tool cover -func=coverage.out
+
+  cross-compile:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Cross-compile ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -ldflags "-s -w" -o /dev/null .

@@ -616,8 +616,9 @@ func firstLine(s string) string {
 			return line
 		}
 	}
-	if len(s) > 100 {
-		return s[:100] + "..."
+	r := []rune(s)
+	if len(r) > 100 {
+		return string(r[:100]) + "..."
 	}
 	return s
 }
@@ -655,6 +656,14 @@ func (s *Server) toolFocus(args json.RawMessage) (any, error) {
 		return nil, err
 	}
 	s.workspace = p.Workspace
+
+	// Persist to config so focus survives restarts
+	cfg := config.Load()
+	cfg.ActiveWorkspace = p.Workspace
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory: save config: %v\n", err)
+	}
+
 	return map[string]string{"workspace": p.Workspace, "status": "switched"}, nil
 }
 

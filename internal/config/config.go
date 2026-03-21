@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -26,7 +27,9 @@ func Load() *Config {
 	if err != nil {
 		return cfg
 	}
-	json.Unmarshal(data, cfg)
+	if err := json.Unmarshal(data, cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-memory: invalid config.json: %v\n", err)
+	}
 	return cfg
 }
 

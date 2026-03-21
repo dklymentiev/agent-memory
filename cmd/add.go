@@ -108,19 +108,8 @@ func embedChunksForDoc(s *store.SQLiteStore, docID string) {
 	defer embedder.Close()
 
 	// Get unembedded chunks for this doc
-	chunks, err := s.GetUnembeddedChunks(10000)
-	if err != nil {
-		return
-	}
-
-	// Filter to only this doc's chunks
-	var docChunks []store.ChunkRecord
-	for _, c := range chunks {
-		if c.DocID == docID {
-			docChunks = append(docChunks, c)
-		}
-	}
-	if len(docChunks) == 0 {
+	docChunks, err := s.GetUnembeddedChunksByDoc(docID, 1000)
+	if err != nil || len(docChunks) == 0 {
 		return
 	}
 

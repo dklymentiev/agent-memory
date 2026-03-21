@@ -37,8 +37,9 @@ func firstLineOf(s string) string {
 			return line
 		}
 	}
-	if len(s) > 100 {
-		return s[:100] + "..."
+	r := []rune(s)
+	if len(r) > 100 {
+		return string(r[:100]) + "..."
 	}
 	return s
 }
@@ -90,9 +91,10 @@ func runContext(cmd *cobra.Command, args []string) error {
 		var lines []string
 		for _, d := range recentDocs {
 			content := d.Content
-			if len(content) > 100 {
-				content = content[:100] + "..."
+			if r := []rune(content); len(r) > 100 {
+				content = string(r[:100]) + "..."
 			}
+
 			content = strings.ReplaceAll(content, "\n", " ")
 			entry := fmt.Sprintf("- [%s] %s", d.CreatedAt.Format("2006-01-02"), content)
 			if used+len(entry) > budget {

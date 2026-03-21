@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          LDFLAGS: "-s -w -X github.com/dklymentiev/agent-memory/cmd.Version=${{ steps.version.outputs.VERSION }}"
+        run: |
+          mkdir -p dist
+
+          # Linux amd64
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/agent-memory-linux-amd64 .
+
+          # Linux arm64
+          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/agent-memory-linux-arm64 .
+
+          # macOS amd64
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/agent-memory-darwin-amd64 .
+
+          # macOS arm64 (Apple Silicon)
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/agent-memory-darwin-arm64 .
+
+          # Windows amd64
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/agent-memory-windows-amd64.exe .
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/agent-memory-*
+            dist/checksums.txt

@@ -38,7 +38,7 @@ One binary. One SQLite file. No Docker. No external database. No configuration r
 
 ## Key Features
 
-**Search that works** -- FTS5 full-text search with BM25 ranking. Optional hybrid search with OpenAI embeddings (30% keyword + 70% semantic). Finds what you need even with different wording.
+**Search that works** -- FTS5 full-text search with BM25 ranking. Optional hybrid search with local ONNX embeddings or OpenAI (30% keyword + 70% semantic). Finds what you need even with different wording. Local embeddings require zero API keys and zero internet.
 
 **Workspaces** -- isolate memories per project. `agent-memory focus backend-api` and everything stays separate.
 
@@ -69,6 +69,38 @@ agent-memory context
 # Pipe files into memory
 cat ARCHITECTURE.md | agent-memory add -f - -t type:artifact --pin
 ```
+
+## Semantic Search (Embeddings)
+
+By default, agent-memory uses FTS5 keyword search. Enable embeddings for hybrid search (30% keyword + 70% semantic) that understands meaning, not just exact words.
+
+**Local embeddings (recommended)** -- runs entirely on your machine, no API keys, no internet after setup:
+
+```bash
+agent-memory embeddings enable --local
+# Downloads ONNX Runtime (~8MB) and all-MiniLM-L6-v2 model (~87MB)
+# Everything stored in ~/.agent-memory/
+```
+
+**OpenAI embeddings** -- higher quality, requires API key:
+
+```bash
+export OPENAI_API_KEY=sk-...
+agent-memory embeddings enable --openai
+```
+
+Once enabled, search automatically uses hybrid mode:
+
+```bash
+agent-memory search "authentication flow"     # hybrid: FTS + semantic
+agent-memory search "auth" --fts              # force keyword-only
+agent-memory search "how do users log in" --semantic  # force semantic-only
+```
+
+| Provider | Model | Dimensions | Speed | Cost |
+|----------|-------|------------|-------|------|
+| local | all-MiniLM-L6-v2 | 384 | ~0.4s/query | Free |
+| openai | text-embedding-3-small | 1536 | ~0.3s/query | ~$0.02/1M tokens |
 
 ## MCP Server (Claude Code Integration)
 
@@ -155,7 +187,6 @@ agent-memory --db /path/to/my.db   # custom path
 
 ## Planned
 
-- [ ] Local embeddings via ONNX (e5-small) -- no OpenAI dependency
 - [ ] Data retention TTL with automatic cleanup
 - [ ] Web UI for browsing and searching memories
 

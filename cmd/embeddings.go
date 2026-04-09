@@ -21,7 +21,7 @@ var embeddingsStatusCmd = &cobra.Command{
 
 var embeddingsEnableCmd = &cobra.Command{
 	Use:   "enable",
-	Short: "Enable embeddings (requires OPENAI_API_KEY)",
+	Short: "Enable embeddings (--local for ONNX, --openai for OpenAI API)",
 	RunE:  runEmbeddingsEnable,
 }
 
@@ -37,10 +37,16 @@ var embeddingsRunCmd = &cobra.Command{
 	RunE:  runEmbeddingsRun,
 }
 
-var embedRunAll bool
+var (
+	embedRunAll    bool
+	enableLocal    bool
+	enableOpenAI   bool
+)
 
 func init() {
 	embeddingsRunCmd.Flags().BoolVar(&embedRunAll, "all", false, "re-embed all chunks (not just unembedded)")
+	embeddingsEnableCmd.Flags().BoolVar(&enableLocal, "local", false, "use local ONNX model (all-MiniLM-L6-v2)")
+	embeddingsEnableCmd.Flags().BoolVar(&enableOpenAI, "openai", false, "use OpenAI API (requires OPENAI_API_KEY)")
 	embeddingsCmd.AddCommand(embeddingsStatusCmd)
 	embeddingsCmd.AddCommand(embeddingsEnableCmd)
 	embeddingsCmd.AddCommand(embeddingsDisableCmd)
@@ -59,6 +65,12 @@ func runEmbeddingsStatus(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Embeddings: enabled\n")
 		fmt.Printf("Provider:   %s\n", provider)
 		fmt.Printf("Model:      %s\n", model)
+		switch provider {
+		case "local", "onnx":
+			fmt.Printf("Dimensions: 384\n")
+		case "openai":
+			fmt.Printf("Dimensions: 1536\n")
+		}
 	}
 
 	// Show chunk stats if we can open the store
@@ -81,12 +93,50 @@ func runEmbeddingsStatus(cmd *cobra.Command, args []string) error {
 }
 
 func runEmbeddingsEnable(cmd *cobra.Command, args []string) error {
+	if enableLocal {
+		return enableLocalEmbeddings()
+	}
+	if enableOpenAI {
+		return enableOpenAIEmbeddings()
+	}
+
+	// Default: if OPENAI_API_KEY is set, use openai; otherwise prompt user
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		return enableOpenAIEmbeddings()
+	}
+	return fmt.Errorf("specify --local (ONNX, no API key needed) or --openai (requires OPENAI_API_KEY)")
+}
+
+func enableLocalEmbeddings() error {
+	// Download model if needed
+	if _, _, err := embed.EnsureModel(); err != nil {
+		return fmt.Errorf("setup ONNX model: %w", err)
+	}
+
+	// Validate we can create the embedder
+	embedder, err := embed.NewOnnxEmbedder(embed.DefaultModelPath(), embed.DefaultVocabPath())
+	if err != nil {
+		return fmt.Errorf("init ONNX embedder: %w", err)
+	}
+	embedder.Close()
+
+	cfg.EmbeddingProvider = "local"
+	cfg.EmbeddingModel = "all-MiniLM-L6-v2"
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Println("Embeddings enabled: local / all-MiniLM-L6-v2 (384 dimensions)")
+	fmt.Println("Run 'agent-memory embeddings run' to generate embeddings for existing chunks.")
+	return nil
+}
+
+func enableOpenAIEmbeddings() error {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return fmt.Errorf("OPENAI_API_KEY environment variable is not set")
 	}
 
-	// Validate we can create the embedder
 	_, err := embed.NewOpenAIEmbedder(apiKey, "")
 	if err != nil {
 		return err
@@ -118,14 +168,12 @@ func runEmbeddingsRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("embeddings not enabled; run 'agent-memory embeddings enable' first")
 	}
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("OPENAI_API_KEY environment variable is not set")
-	}
-
-	embedder, err := embed.NewOpenAIEmbedder(apiKey, cfg.EmbeddingModel)
+	embedder, err := embed.NewEmbedder(cfg.EmbeddingProvider, cfg.EmbeddingModel)
 	if err != nil {
 		return err
+	}
+	if embedder == nil {
+		return fmt.Errorf("could not create embedder for provider %q", cfg.EmbeddingProvider)
 	}
 	defer embedder.Close()
 

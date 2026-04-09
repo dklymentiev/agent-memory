@@ -433,12 +433,8 @@ func (s *Server) embedChunksForDoc(docID string) {
 	if cfg.EmbeddingProvider == "" {
 		return
 	}
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return
-	}
-	embedder, err := embed.NewOpenAIEmbedder(apiKey, cfg.EmbeddingModel)
-	if err != nil {
+	embedder, err := embed.NewEmbedder(cfg.EmbeddingProvider, cfg.EmbeddingModel)
+	if err != nil || embedder == nil {
 		return
 	}
 	defer embedder.Close()
@@ -486,15 +482,12 @@ func (s *Server) toolSearch(args json.RawMessage) (any, error) {
 	// Auto-detect: use hybrid search if embeddings are enabled
 	cfg := config.Load()
 	if cfg.EmbeddingProvider != "" {
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey != "" {
-			embedder, err := embed.NewOpenAIEmbedder(apiKey, cfg.EmbeddingModel)
+		embedder, err := embed.NewEmbedder(cfg.EmbeddingProvider, cfg.EmbeddingModel)
+		if err == nil && embedder != nil {
+			defer embedder.Close()
+			queryEmb, err := embedder.Embed(p.Query)
 			if err == nil {
-				defer embedder.Close()
-				queryEmb, err := embedder.Embed(p.Query)
-				if err == nil {
-					return s.store.HybridSearch(p.Query, queryEmb, ws, limit)
-				}
+				return s.store.HybridSearch(p.Query, queryEmb, ws, limit)
 			}
 		}
 	}

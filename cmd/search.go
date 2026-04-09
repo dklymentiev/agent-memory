@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -45,44 +44,36 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	var results []store.SearchResult
 
 	// Determine search mode
-	useEmbeddings := !searchFTS && cfg.EmbeddingProvider != "" && os.Getenv("OPENAI_API_KEY") != ""
+	useEmbeddings := !searchFTS && cfg.EmbeddingProvider != ""
 
 	if searchSemantic || (useEmbeddings && !searchFTS) {
-		// Need to embed the query
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
+		embedder, err := embed.NewEmbedder(cfg.EmbeddingProvider, cfg.EmbeddingModel)
+		if err != nil {
 			if searchSemantic {
-				return fmt.Errorf("OPENAI_API_KEY required for semantic search")
+				return err
 			}
-			// Fallback to FTS
 			useEmbeddings = false
-		} else {
-			embedder, err := embed.NewOpenAIEmbedder(apiKey, cfg.EmbeddingModel)
+		} else if embedder != nil {
+			defer embedder.Close()
+
+			queryEmb, err := embedder.Embed(query)
 			if err != nil {
 				if searchSemantic {
-					return err
+					return fmt.Errorf("embed query: %w", err)
 				}
 				useEmbeddings = false
 			} else {
-				defer embedder.Close()
-
-				queryEmb, err := embedder.Embed(query)
-				if err != nil {
-					if searchSemantic {
-						return fmt.Errorf("embed query: %w", err)
-					}
-					useEmbeddings = false
+				if searchSemantic {
+					results, err = s.SearchSemantic(queryEmb, workspace, searchLimit)
 				} else {
-					if searchSemantic {
-						results, err = s.SearchSemantic(queryEmb, workspace, searchLimit)
-					} else {
-						results, err = s.HybridSearch(query, queryEmb, workspace, searchLimit)
-					}
-					if err != nil {
-						return err
-					}
+					results, err = s.HybridSearch(query, queryEmb, workspace, searchLimit)
+				}
+				if err != nil {
+					return err
 				}
 			}
+		} else {
+			useEmbeddings = false
 		}
 	}
 

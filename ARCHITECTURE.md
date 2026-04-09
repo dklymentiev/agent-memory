@@ -91,7 +91,9 @@ agent-memory/
       chunker_test.go     Tests
     embed/
       embedder.go         Embedder interface
-      openai.go           OpenAI API client
+      factory.go          Provider-agnostic embedder creation + model/runtime auto-download
+      onnx.go             Local ONNX embedder (all-MiniLM-L6-v2, 384 dims)
+      openai.go           OpenAI API client (text-embedding-3-small, 1536 dims)
       cosine.go           Cosine similarity + top-K
     tagger/
       autotag.go          Tag inference from similar documents
@@ -140,10 +142,9 @@ store.AddChunks()
   | 14. DELETE old chunks, INSERT new ones (in transaction)
   v
 embed (if enabled)
-  | 15. Load config, check OPENAI_API_KEY
-  | 16. Create OpenAI embedder
-  | 17. Batch-embed chunk texts
-  | 18. Store embeddings as BLOB (little-endian float32)
+  | 15. Load config, create embedder via factory (local ONNX or OpenAI)
+  | 16. Batch-embed chunk texts (local: ~0.4s/query, OpenAI: API call)
+  | 17. Store embeddings as BLOB (little-endian float32, 384 or 1536 dims)
   v
 Done -> return {id, status: "created"}
 ```
@@ -154,7 +155,7 @@ Done -> return {id, status: "created"}
 Query arrives (CLI or MCP)
   |
   v
-Is embedding enabled AND OPENAI_API_KEY set?
+Is embedding enabled? (provider = "local" or "openai")
   |                    |
   no                  yes
   |                    |
@@ -396,8 +397,8 @@ Config file         -->  chmod 0600
 - **Hooks open/close DB per invocation** -- each hook event opens a new SQLite
   connection. WAL mode prevents contention, but there is connection overhead.
 
-- **OpenAI-only embeddings** -- semantic search requires an OpenAI API key.
-  Local ONNX embeddings (e5-small) are planned but not yet implemented.
+- **Embedding provider lock-in** -- switching providers (local vs OpenAI) requires
+  re-embedding all chunks since vector dimensions differ (384 vs 1536).
 
 - **Single-writer** -- SQLite WAL allows concurrent reads but only one writer.
   Not an issue for single-agent use; may need connection pooling for multi-agent.
@@ -406,7 +407,6 @@ Config file         -->  chmod 0600
 
 Areas being considered for future versions:
 
-- **Local embeddings** (ONNX runtime with e5-small) -- remove OpenAI dependency
 - **Data retention TTL** -- automatic cleanup of old documents
 - **Web UI** -- browser-based memory viewer and search
 - **Import command** -- structured import from JSON/Markdown exports

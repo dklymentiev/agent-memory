@@ -97,12 +97,8 @@ func embedChunksForDoc(s *store.SQLiteStore, docID string) {
 	if cfg.EmbeddingProvider == "" {
 		return
 	}
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return
-	}
-	embedder, err := embed.NewOpenAIEmbedder(apiKey, cfg.EmbeddingModel)
-	if err != nil {
+	embedder, err := embed.NewEmbedder(cfg.EmbeddingProvider, cfg.EmbeddingModel)
+	if err != nil || embedder == nil {
 		return
 	}
 	defer embedder.Close()
